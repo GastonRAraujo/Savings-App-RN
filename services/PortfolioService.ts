@@ -1,51 +1,47 @@
-// File: services/PortfolioService.ts
-
 import dolarMEP from './DolarMEP';
 import iolService from './IolService';
 
-// ====== 1) Store an operation in the Operations table ====== //
+//////////////////////////////////////////////////////////////////////
+// Store an operation in the Operations table (no double conversion)
+//////////////////////////////////////////////////////////////////////
 export async function storeOperation(db: any, operation: any) {
   try {
-    // 1. Determine the currency by calling getSymbolInfo
+    // 1. Check symbol's currency from the server
     const titulo = await iolService.getSymbolInfo(operation.simbolo); 
     // e.g., { moneda: 'peso_Argentino' | 'dolares_EstadosUnidos' }
 
     const mepRateData = await dolarMEP.fetchMEPExchangeRate();
     const mepRate = mepRateData ? mepRateData.sellRate : 1;
 
+    // 2. We'll interpret `operation.precioOperado` as ARS if 'peso', or USD otherwise
     let priceARS = 0;
     let priceUSD = 0;
 
-    // 2. precioOperado => can be ARS or USD
-    const precioOperado = operation.precioOperado ?? 0; 
-    // Make sure your operation object has 'precioOperado'.
-    // If not, adapt this to the correct field name.
+    const precioOperado = operation.precioOperado ?? 0;
 
-    if (titulo.moneda === 'peso_Argentino') {
+    // If the server says it's pesos, then: ARS = precioOperado, USD = ARS / mepRate
+    if (titulo.moneda.toLowerCase().includes('peso')) {
       priceARS = precioOperado;
-      priceUSD = priceARS / mepRate;
+      priceUSD = precioOperado / mepRate;
     } else {
-      // Assume 'dolares_EstadosUnidos'
+      // Otherwise treat it as USD
       priceUSD = precioOperado;
-      priceARS = priceUSD * mepRate;
+      priceARS = precioOperado * mepRate;
     }
 
-    // 3. cantidadOperada
-    const cantidad = operation.cantidadOperada ?? 0;
-
-    // 4. Insert into Operations
-    await db.executeAsync(
+    // 3. Insert into Operations
+    await db.execAsync(
       `INSERT INTO Operations 
        (numero, fecha, tipo, simbolo, cantidad, priceARS, priceUSD)
        VALUES (?,?,?,?,?,?,?)`,
       [
         operation.numero,
-        operation.fechaOperada, 
+        operation.fechaOperada,
         operation.tipo,
         operation.simbolo,
-        cantidad,
+        operation.cantidadOperada ?? 0,
         priceARS,
-        priceUSD
+        priceUSD,
       ]
     );
 
@@ -55,7 +51,9 @@ export async function storeOperation(db: any, operation: any) {
   }
 }
 
-// ====== 2) Update the Portfolio table after a buy or sell operation ====== //
+//////////////////////////////////////////////////////////////////////
+// Update the Portfolio table after a buy or sell (no double conversion)
+//////////////////////////////////////////////////////////////////////
 export async function updatePortfolio(db: any, operation: any, priceARS: number, priceUSD: number) {
   const isBuy = (
     operation.tipo === 'Compra' || 
@@ -71,38 +69,41 @@ export async function updatePortfolio(db: any, operation: any, priceARS: number,
   const cantidadOperada = operation.cantidadOperada ?? 0;
 
   // 1. Check if symbol exists
-  const existing = await db.runAsync(
+  const existingRows = await db.runAsync(
     `SELECT * FROM Portfolio WHERE symbol = ?`,
     [operation.simbolo]
   );
 
-  // 2. If symbol not found and this is a buy => insert new row
-  if (existing.length === 0 && isBuy) {
-    await db.executeAsync(
+  // 2. If symbol not found & it's a buy => create new row
+  if (existingRows.length === 0 && isBuy) {
+    console.log('Adding new symbol to portfolio:', operation.simbolo);
+    await db.execAsync(
       `INSERT INTO Portfolio 
         (symbol, amount, ppcARS, ppcUSD, lastPriceARS, lastPriceUSD, date) 
        VALUES (?,?,?,?,?,?,?)`,
       [
         operation.simbolo,
-        cantidadOperada,     // new amount
-        priceARS,            // avg cost in ARS
-        priceUSD,            // avg cost in USD
-        priceARS,            // lastPriceARS initially same as cost
-        priceUSD,            // lastPriceUSD
+        cantidadOperada,
+        priceARS,
+        priceUSD,
+        priceARS,
+        priceUSD,
         new Date().toISOString()
       ]
     );
-  } 
-  // 3. If symbol found => update row
-  else if (existing.length > 0) {
-    const row = existing[0];
+    return;
+  }
+
+  // 3. Symbol found => update
+  if (existingRows.length > 0) {
+    console.log('Updating existing symbol in portfolio:', operation.simbolo);
+    const row = existingRows[0];
     let newAmount = row.amount;
 
     if (isBuy) {
-      // new total shares
       newAmount = row.amount + cantidadOperada;
 
-      // Weighted average for ppcARS / ppcUSD
+      // Weighted avg for ppcARS, ppcUSD
       const oldCostARS = row.amount * row.ppcARS;
       const newCostARS = cantidadOperada * priceARS;
       const totalARS = oldCostARS + newCostARS;
@@ -111,10 +112,10 @@ export async function updatePortfolio(db: any, operation: any, priceARS: number,
       const newCostUSD = cantidadOperada * priceUSD;
       const totalUSD = oldCostUSD + newCostUSD;
 
-      const newPpcARS = newAmount !== 0 ? totalARS / newAmount : 0;
-      const newPpcUSD = newAmount !== 0 ? totalUSD / newAmount : 0;
+      const newPpcARS = newAmount ? totalARS / newAmount : 0;
+      const newPpcUSD = newAmount ? totalUSD / newAmount : 0;
 
-      await db.executeAsync(
+      await db.execAsync(
         `UPDATE Portfolio
          SET amount = ?, ppcARS = ?, ppcUSD = ?, lastPriceARS = ?, lastPriceUSD = ?, date = ?
          WHERE id = ?`,
@@ -122,25 +123,23 @@ export async function updatePortfolio(db: any, operation: any, priceARS: number,
           newAmount, 
           newPpcARS,
           newPpcUSD,
-          priceARS,     // update lastPriceARS with this operation's price
-          priceUSD,     // update lastPriceUSD
+          priceARS,       // set lastPrice to the operation's price
+          priceUSD,
           new Date().toISOString(),
           row.id
         ]
       );
-    } 
-    else if (isSell) {
-      // subtract shares
+    } else if (isSell) {
       newAmount = row.amount - cantidadOperada;
       if (newAmount < 0) newAmount = 0; // or handle oversell differently
 
-      await db.executeAsync(
+      await db.execAsync(
         `UPDATE Portfolio
          SET amount = ?, lastPriceARS = ?, lastPriceUSD = ?, date = ?
          WHERE id = ?`,
         [
           newAmount,
-          row.lastPriceARS,   // or you might update the lastPrice to operation's price?
+          row.lastPriceARS, // Keep lastPrice if you prefer
           row.lastPriceUSD,
           new Date().toISOString(),
           row.id
@@ -150,59 +149,43 @@ export async function updatePortfolio(db: any, operation: any, priceARS: number,
   }
 }
 
+
 // ====== 3) Save snapshot of total portfolio value (PortfolioValue table) ====== //
 export async function savePortfolioValueSnapshot(db: any) {
-  // 1. Query local portfolio data
-  const rows = await db.getAllAsync(
-    "SELECT symbol, amount, ppcARS, ppcUSD, lastPriceARS, lastPriceUSD FROM Portfolio"
+  await db.runAsync(
+    `
+    INSERT INTO PortfolioValue (priceUSD, priceARS, date)
+    SELECT
+      COALESCE(SUM(amount * lastPriceUSD), 0) AS totalUSD,
+      COALESCE(SUM(amount * lastPriceARS), 0) AS totalARS,
+      ? AS snapshotDate
+    FROM Portfolio
+    `,
+    [new Date().toISOString()]
   );
-
-  // 2. Fetch fresh portfolio data from IOL (if you want real-time prices)
-  const iolData = await iolService.getPortfolio(); 
-  // iolData: an array of { symbol, ppcARS, ppcUSD, amount, etc. } from the broker's perspective
-
-  let totalARS = 0;
-  let totalUSD = 0;
-
-  for (const row of rows) {
-    const symbol = row.symbol;
-    const amount = row.amount;
-
-    // Check fresh data for current price
-    const freshInfo = iolData.find((a: any) => a.symbol === symbol);
-    if (freshInfo) {
-      // If found in fresh data, use fresh prices
-      const currentPriceARS = freshInfo.ppcARS;
-      const currentPriceUSD = freshInfo.ppcUSD;
-
-      // Update the local row's lastPrice if you want to keep track
-      await db.executeAsync(
-        `UPDATE Portfolio
-         SET lastPriceARS = ?, lastPriceUSD = ?
-         WHERE symbol = ?`,
-        [currentPriceARS, currentPriceUSD, symbol]
-      );
-
-      // Multiply by local "amount" to get total value
-      totalARS += amount * currentPriceARS;
-      totalUSD += amount * currentPriceUSD;
-    } else {
-      // If not found in fresh data, fallback to lastPrice stored in DB
-      totalARS += amount * row.lastPriceARS;
-      totalUSD += amount * row.lastPriceUSD;
-    }
-  }
-
-  // 4. Insert a new row into PortfolioValue
-  await db.executeAsync(
-    `INSERT INTO PortfolioValue (priceUSD, priceARS, date) VALUES (?,?,?)`,
-    [
-      totalUSD,
-      totalARS,
-      new Date().toISOString()
-    ]
-  );
-
-  console.log(`Saved portfolio value snapshot: ${totalARS.toFixed(2)} ARS / ${totalUSD.toFixed(2)} USD`);
 }
 
+
+export async function refreshPortfolioPrices(db: any) {
+  // 1. Grab all local Portfolio rows
+  const localRows = await db.getAllAsync(`
+    SELECT symbol, lastPriceARS, lastPriceUSD
+    FROM Portfolio
+  `);
+
+  // 2. Fetch fresh data from IOL (which has correct ARS & USD fields)
+  const iolData = await iolService.getPortfolio();
+
+  console.debug('Refreshing portfolio prices...',iolData);
+  // 3. For each local row, match the symbol in the fresh data
+  for (const row of localRows) {
+    const freshInfo = iolData.find((item: any) => item.symbol === row.symbol);
+    if (freshInfo) {
+      // Directly store freshInfo.ppcARS / ppcUSD -> lastPriceARS / lastPriceUSD
+      await db.runAsync(
+        'UPDATE Portfolio SET lastPriceARS = ?, lastPriceUSD = ? WHERE symbol = ?',
+        [freshInfo.latestPriceARS, freshInfo.latestPriceUSD, row.symbol]
+      );
+    }
+  }
+}

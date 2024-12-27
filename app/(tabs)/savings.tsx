@@ -1,16 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch, FlatList, ActivityIndicator } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';  // or however you access your DB
+import {
+  View,
+  Text,
+  StyleSheet,
+  Switch,
+  FlatList,
+  ActivityIndicator,
+  Pressable,
+} from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite'; // or however you access your DB
+import { Alert } from 'react-native';
 
-// Import the service & types
+// Import the queries and the refresh function
 import {
   getLatestPortfolioValue,
   getPreviousPortfolioValue,
   getAllPortfolioItems,
 } from '@/services/PortfolioQueries';
+import {
+  refreshPortfolioPrices,
+  savePortfolioValueSnapshot,
+} from '@/services/PortfolioService';
 
+import { PortfolioValue, PortfolioItem } from '@/app/types';
 
-import {PortfolioValue, PortfolioItem} from '@/app/types';
+const formatAmountWithSeparator = (amount?: number) => {
+  if (!amount) return '0.00';
+  // Ensure only two decimals, then format with locale separator
+  return new Intl.NumberFormat('es-AR').format(parseFloat(amount.toFixed(2)));
+};
 
 const SavingsScreen = () => {
   // 1) Access the DB context
@@ -25,39 +43,55 @@ const SavingsScreen = () => {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [showInARS, setShowInARS] = useState(true);
 
-  // 3) Fetch data from DB on mount
+  // 3) Initial data load
   useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-
-        // Query the DB for:
-        // 1. The latest portfolio value (current)
-        // 2. The second-latest portfolio value (previous)
-        // 3. The list of portfolio items
-        const [latestVal, prevVal, items] = await Promise.all([
-          getLatestPortfolioValue(db),
-          getPreviousPortfolioValue(db),
-          getAllPortfolioItems(db),
-        ]);
-
-        setCurrentPortfolioValue(latestVal);
-        setPreviousPortfolioValue(prevVal);
-        setPortfolio(items);
-      } catch (err: any) {
-        console.error('Error loading data in SavingsScreen:', err);
-        setError(err?.message || 'Error loading data');
-      } finally {
-        setLoading(false);
-      }
-    }
-
     if (db) {
       loadData();
     }
   }, [db]);
 
-  // 4) If loading or error, show feedback
+  // Helper: fetch everything from DB
+  async function loadData() {
+    try {
+      setLoading(true);
+
+      // Get the current snapshot, previous snapshot, and portfolio items
+      const [latestVal, prevVal, items] = await Promise.all([
+        getLatestPortfolioValue(db),
+        getPreviousPortfolioValue(db),
+        getAllPortfolioItems(db),
+      ]);
+
+      setCurrentPortfolioValue(latestVal);
+      setPreviousPortfolioValue(prevVal);
+      setPortfolio(items);
+    } catch (err: any) {
+      console.error('Error loading data in SavingsScreen:', err);
+      setError(err?.message || 'Error loading data');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 4) Refresh prices from IOL, recalc portfolio value, then reload data
+  async function handleRefreshPrices() {
+    if (!db) return;
+    try {
+      setLoading(true);
+      await refreshPortfolioPrices(db);
+      await savePortfolioValueSnapshot(db);
+      await loadData();
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Error refreshing prices:', err);
+      Alert.alert(
+        'Refresh Error',
+        err?.message || 'Something went wrong while refreshing prices.'
+      );
+    }
+  }
+
+  // 5) If loading or error, show feedback
   if (loading) {
     return (
       <View style={styles.center}>
@@ -75,7 +109,7 @@ const SavingsScreen = () => {
     );
   }
 
-  // 5) Calculate performance using current and previous snapshots
+  // 6) Calculate performance using current and previous snapshots
   let currentTotal = 0;
   let previousTotal = 0;
   let difference = 0;
@@ -94,24 +128,55 @@ const SavingsScreen = () => {
   difference = currentTotal - previousTotal;
   percentage = previousTotal !== 0 ? (difference / previousTotal) * 100 : 0;
 
-  // 6) Render each portfolio item in the list
+  // 7) Render each portfolio item in the list
   const renderPortfolioItem = ({ item }: { item: PortfolioItem }) => {
-    const currencyLabel = showInARS ? 'ARS' : 'USD';
+    const currencyLabel = showInARS ? 'AR$' : 'U$D';
     const ppc = showInARS ? item.ppcARS : item.ppcUSD;
     const latest = showInARS ? item.lastPriceARS : item.lastPriceUSD;
-
+  
+    const totalItemValue = item.amount * latest;
+    const itemDifference = latest - ppc;
+    const itemPercentage = ppc !== 0 ? (itemDifference / ppc) * 100 : 0;
+  
     return (
-      <View style={styles.itemCard}>
-        <Text style={styles.symbol}>{item.symbol}</Text>
-        {item.description ? <Text style={styles.description}>{item.description}</Text> : null}
-        <Text>Amount: {item.amount}</Text>
-        <Text>PPC ({currencyLabel}): {ppc.toFixed(2)}</Text>
-        <Text>Latest ({currencyLabel}): {latest.toFixed(2)}</Text>
+      <View style={styles.compactCard}>
+        {/* Header */}
+        <View style={styles.compactHeader}>
+          <Text style={styles.symbol}>{item.symbol}</Text>
+          {item.description && <Text style={styles.description}>{item.description}</Text>}
+        </View>
+        
+        {/* Content Row */}
+        <View style={styles.compactContentRow}>
+          <Text style={styles.compactText}>Amt: <Text style={styles.value}>{item.amount}</Text></Text>
+          <Text style={styles.compactText}>PPC: <Text style={styles.value}>{formatAmountWithSeparator(ppc)} {currencyLabel}</Text></Text>
+        </View>
+  
+        {/* Content Row 2 */}
+        <View style={styles.compactContentRow}>
+          <Text style={styles.compactText}>Latest: <Text style={styles.value}>{formatAmountWithSeparator(latest)} {currencyLabel}</Text></Text>
+          <Text style={styles.compactText}>Total: <Text style={styles.value}>{formatAmountWithSeparator(totalItemValue)} {currencyLabel}</Text></Text>
+        </View>
+  
+        {/* Footer */}
+        <View style={styles.compactFooter}>
+          <Text
+            style={[
+              styles.difference,
+              itemDifference >= 0 ? styles.positive : styles.negative,
+            ]}
+          >
+            {itemDifference >= 0 ? '+' : '-'}
+            {Math.abs(itemDifference).toFixed(2)} (
+            {itemDifference >= 0 ? '+' : '-'}
+            {Math.abs(itemPercentage).toFixed(2)}%)
+          </Text>
+        </View>
       </View>
     );
   };
 
-  // 7) UI Render
+  // 8) Main UI Render
   return (
     <View style={styles.container}>
       {/* Card for total value & performance */}
@@ -120,14 +185,16 @@ const SavingsScreen = () => {
           {showInARS ? 'Total (ARS)' : 'Total (USD)'}
         </Text>
         <Text style={styles.valueAmount}>
-          {currentTotal.toFixed(2)}
+          {formatAmountWithSeparator(currentTotal)}
         </Text>
-        
+
         {/* Performance difference & percent */}
-        <Text style={[
-          styles.performance,
-          { color: difference >= 0 ? '#008000' : '#ff0000' }
-        ]}>
+        <Text
+          style={[
+            styles.performance,
+            { color: difference >= 0 ? '#008000' : '#ff0000' },
+          ]}
+        >
           {difference >= 0 ? '+' : '-'}
           {Math.abs(difference).toFixed(2)} (
           {difference >= 0 ? '+' : '-'}
@@ -137,11 +204,13 @@ const SavingsScreen = () => {
         {/* Switch between ARS and USD */}
         <View style={styles.switchRow}>
           <Text>Show in ARS</Text>
-          <Switch
-            value={showInARS}
-            onValueChange={(val) => setShowInARS(val)}
-          />
+          <Switch value={showInARS} onValueChange={(val) => setShowInARS(val)} />
         </View>
+
+        {/* Refresh Prices Button */}
+        <Pressable style={styles.refreshButton} onPress={handleRefreshPrices}>
+          <Text style={styles.refreshButtonText}>Refresh Prices</Text>
+        </Pressable>
       </View>
 
       {/* Portfolio list */}
@@ -157,22 +226,18 @@ const SavingsScreen = () => {
 
 export default SavingsScreen;
 
+// Styles
 const styles = StyleSheet.create({
-  center: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
   },
   container: {
     flex: 1,
     backgroundColor: '#f2f2f2',
     paddingTop: 40,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 16,
   },
   card: {
     backgroundColor: '#fff',
@@ -202,7 +267,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginBottom: 12,
+  },
+  refreshButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   itemCard: {
     backgroundColor: '#fff',
@@ -211,12 +286,70 @@ const styles = StyleSheet.create({
     padding: 12,
     elevation: 2,
   },
+  cardContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+
+  compactCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  compactHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   symbol: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
   description: {
-    color: '#444',
+    fontSize: 12,
+    color: '#777',
+  },
+  compactContentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 4,
+  },
+  compactText: {
+    fontSize: 12,
+    color: '#444',
+  },
+  value: {
+    fontWeight: '600',
+    color: '#000',
+  },
+  compactFooter: {
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 4,
+  },
+  difference: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  positive: {
+    color: '#4CAF50',
+  },
+  negative: {
+    color: '#F44336',
   },
 });

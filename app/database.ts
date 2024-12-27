@@ -78,29 +78,32 @@ export async function isPortfolioEmpty(db: any): Promise<boolean> {
 //////////////////////////////////////////////////////////////
 export async function populatePortfolioTable(db: any) {
   try {
-    // Fetch the portfolio from the IOL service
+    // 1) fetch from IOL
     const portfolioData = await iolService.getPortfolio();
-    // Insert each item
+    console.log('IOL portfolio data:', portfolioData);
+
+    // 2) Insert each row directly
     for (const item of portfolioData) {
       await db.runAsync(
-        `INSERT INTO Portfolio (symbol, description, type, ppcARS, ppcUSD, amount, lastPriceARS, lastPriceUSD, date)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO Portfolio 
+         (symbol, description, type, ppcARS, ppcUSD, amount, lastPriceARS, lastPriceUSD, date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           item.symbol,
           item.description,
           item.type,
-          item.ppcARS,
-          item.ppcUSD,
+          item.ppcARS,   // AS IS
+          item.ppcUSD,   // AS IS
           item.amount,
-          item.ppcARS,
+          item.ppcARS,   // initial lastPrice = ppc
           item.ppcUSD,
-          new Date().toISOString(),
+          new Date().toISOString()
         ]
       );
     }
-    console.log("Portfolio table populated successfully.");
+    console.log(`Portfolio table populated with ${portfolioData.length} items`);
   } catch (error) {
-    console.error("Error populating portfolio table:", error);
+    console.error('Error populating Portfolio table:', error);
   }
 }
 

@@ -2,6 +2,7 @@ import axios from 'axios';
 import qs from 'qs';
 import * as SecureStore from 'expo-secure-store';
 import dolarMEP from './DolarMEP';
+import { act } from 'react-test-renderer';
 
 class IOLService {
     client: any;
@@ -45,7 +46,6 @@ class IOLService {
             }
           );
       
-          console.log('response Auth', response);
           this.setTokenData(response.data);
           this.enableInterceptor();
         } catch (error) {
@@ -90,23 +90,33 @@ class IOLService {
             const exchangeRate = await dolarMEP.fetchMEPExchangeRate();  // Fetch exchange rate
 
             return response.data.activos.map((activo: any) => {
-                // Use a ternary operator to choose the correct fields based on moneda
-                return activo.titulo.moneda === 'peso_argentino' 
+                if (['ObligacionesNegociables', 'TitulosPublicos'].includes(activo.titulo.tipo)
+                    && activo.titulo.moneda.toLowerCase().includes('peso')) {
+                    activo.ppc = activo.ppc / 100;
+                    activo.ultimoPrecio = activo.ultimoPrecio / 100;
+                  }
+
+                  // Use a ternary operator to choose the correct fields based on moneda
+                return activo.titulo.moneda.toLowerCase().includes('peso')
                     ? {
                         symbol: activo.titulo.simbolo,
                         description: activo.titulo.descripcion,
                         type: activo.titulo.tipo,
                         ppcARS: activo.ppc, // Purchase Price per unit in ARS
                         ppcUSD: activo.ppc / (exchangeRate ? exchangeRate.buyRate : 1),  // Convert to USD
-                        amount: activo.cantidad // Amount of stocks
+                        amount: activo.cantidad, // Amount of stocks
+                        latestPriceARS: activo.ultimoPrecio, // Last price per unit in ARS
+                        latestPriceUSD: activo.ultimoPrecio / (exchangeRate ? exchangeRate.buyRate : 1) // Convert to USD
                     } 
                     : {
                         symbol: activo.titulo.simbolo,
                         description: activo.titulo.descripcion,
                         type: activo.titulo.tipo,
-                        ppcUSD: activo.ppc, // Purchase Price per unit in USD
                         ppcARS: activo.ppc * (exchangeRate ? exchangeRate.sellRate : 1),  // Convert to ARS
-                        amount: activo.cantidad // Amount of stocks
+                        ppcUSD: activo.ppc, // Purchase Price per unit in USD
+                        amount: activo.cantidad, // Amount of stocks
+                        latestPriceARS: activo.ultimoPrecio * (exchangeRate ? exchangeRate.sellRate : 1), // Convert to ARS
+                        latestPriceUSD: activo.ultimoPrecio, // Last price per unit in USD
                     };
             });
         } catch (error) {
