@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS Portfolio(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol TEXT NOT NULL,
     description TEXT NOT NULL,
+    type TEXT NOT NULL,
     amount REAL NOT NULL,
     ppcARS REAL NOT NULL,
     ppcUSD REAL NOT NULL,
@@ -82,7 +83,7 @@ export async function populatePortfolioTable(db: any) {
     // Insert each item
     for (const item of portfolioData) {
       await db.runAsync(
-        `INSERT INTO Portfolio (symbol, description, type, ppcARS, ppcUSD, amount)
+        `INSERT INTO Portfolio (symbol, description, type, ppcARS, ppcUSD, amount, lastPriceARS, lastPriceUSD, date)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
           item.symbol,
@@ -90,7 +91,10 @@ export async function populatePortfolioTable(db: any) {
           item.type,
           item.ppcARS,
           item.ppcUSD,
-          item.amount
+          item.amount,
+          item.ppcARS,
+          item.ppcUSD,
+          new Date().toISOString(),
         ]
       );
     }
