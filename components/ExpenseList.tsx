@@ -1,54 +1,52 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Income } from '@/app/types';
+import { Expense } from '@/app/types';
 
-// Utility function to format date
 const formatDate = (date: string) => {
   const dateObj = new Date(date);
   const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
   const year = dateObj.getFullYear();
   const hours = String(dateObj.getHours()).padStart(2, '0');
   const minutes = String(dateObj.getMinutes()).padStart(2, '0');
   return `${day}-${month}-${year} ${hours}:${minutes}`;
 };
 
-// Utility function to format numbers with thousands separator for AR$
 const formatAmountWithSeparator = (amount: number) => {
   return new Intl.NumberFormat('es-AR').format(amount);
 };
 
-export default function IncomeList({
-  incomes,
-  deleteIncome,
+export default function ExpenseList({
+  expenses,
+  deleteExpense,
 }: {
-  incomes: Income[];
-  deleteIncome: (id: number) => void;
+  expenses: Expense[];
+  deleteExpense: (id: number) => void;
 }) {
   return (
     <View style={styles.listContainer}>
-      {incomes.map((income, index) => (
+      {expenses.map((expense, index) => (
         <TouchableOpacity
-          key={income.id}
+          key={expense.id}
           activeOpacity={0.8}
-          onLongPress={() => deleteIncome(income.id)}  // Use long press to delete
+          onLongPress={() => deleteExpense(expense.id)}  // Use long press to delete
         >
           <View
             style={[
-              styles.incomeRow,
+              styles.expenseRow,
               { backgroundColor: index % 2 === 0 ? '#f0f8ff' : '#f8f8ff' }, // Alternate row colors
             ]}
           >
             <View style={styles.rowContent}>
-              <Text style={styles.incomeName}>{income.name}</Text>
-              <Text style={styles.incomeDate}>{formatDate(income.date)}</Text>
+              <Text style={styles.expenseName}>{expense.name}</Text>
+              <Text style={styles.expenseDate}>{formatDate(expense.date)}</Text>
             </View>
             <View style={styles.amountContainer}>
               <Text style={styles.amountText}>
-                US${formatAmountWithSeparator(income.amountUSD)}
+                US${formatAmountWithSeparator(expense.amountUSD)}
               </Text>
               <Text style={styles.amountText}>
-                AR${formatAmountWithSeparator(income.amountARS)}
+                AR${formatAmountWithSeparator(expense.amountARS)}
               </Text>
             </View>
           </View>
@@ -62,22 +60,22 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 0,
   },
-  incomeRow: {
-    paddingVertical: 10, // Vertical padding
-    paddingHorizontal: 15, // Horizontal padding
-    marginBottom: 1, // Small space between rows
+  expenseRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginBottom: 1,
   },
   rowContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6, // Space between title and amounts
+    marginBottom: 6,
   },
-  incomeName: {
+  expenseName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
   },
-  incomeDate: {
+  expenseDate: {
     fontSize: 12,
     color: '#777',
     textAlign: 'right',

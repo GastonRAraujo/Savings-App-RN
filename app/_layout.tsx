@@ -19,23 +19,14 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-  const [dbLoaded, setDbLoaded] = useState(false);
-
-  // Load database when the component mounts
-  useEffect(() => {
-    loadDatabase()
-      .then(() => setDbLoaded(true))
-      .catch((e) => console.error('Error loading database:', e));
-  }, []);
-
   // Hide splash screen once both fonts and database are loaded
   useEffect(() => {
-    if (fontsLoaded && dbLoaded) {
+    if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, dbLoaded]);
+  }, [fontsLoaded]);
 
-  if (!fontsLoaded || !dbLoaded) {
+  if (!fontsLoaded) {
     // Show loading screen until fonts and database are ready
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -49,7 +40,7 @@ export default function RootLayout() {
     // Wrap the entire app inside GestureHandlerRootView
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <SQLiteProvider databaseName="mySQLiteDB.db" useSuspense>
+        <SQLiteProvider databaseName="mySQLiteDB.db" onInit={loadDatabase}>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
