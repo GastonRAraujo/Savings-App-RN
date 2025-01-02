@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SafeAreaView } from 'react-native';
 import {
   View,
   Text,
@@ -9,7 +10,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite'; // or however you access your DB
-import { Alert } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 // Import the queries and the refresh function
 import {
@@ -81,15 +82,28 @@ const SavingsScreen = () => {
       await refreshPortfolioPrices(db);
       await savePortfolioValueSnapshot(db);
       await loadData();
-      setLoading(false);
-    } catch (err: any) {
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Prices refreshed successfully!',
+      });
+    } catch (err: unknown) {
       console.error('Error refreshing prices:', err);
-      Alert.alert(
-        'Refresh Error',
-        err?.message || 'Something went wrong while refreshing prices.'
-      );
+      const message =
+        typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as any).message)
+          : 'Something went wrong while refreshing prices.';
+    
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: message,
+      });
+    } finally {
+      setLoading(false);
     }
   }
+  
 
   // 5) If loading or error, show feedback
   if (loading) {
@@ -141,88 +155,107 @@ const SavingsScreen = () => {
     return (
       <View style={styles.compactCard}>
         {/* Header */}
-        <View style={styles.compactHeader}>
+        <View style={styles.cardHeader}>
           <Text style={styles.symbol}>{item.symbol}</Text>
-          {item.description && <Text style={styles.description}>{item.description}</Text>}
-        </View>
-        
-        {/* Content Row */}
-        <View style={styles.compactContentRow}>
-          <Text style={styles.compactText}>Amt: <Text style={styles.value}>{item.amount}</Text></Text>
-          <Text style={styles.compactText}>PPC: <Text style={styles.value}>{formatAmountWithSeparator(ppc)} {currencyLabel}</Text></Text>
-        </View>
-  
-        {/* Content Row 2 */}
-        <View style={styles.compactContentRow}>
-          <Text style={styles.compactText}>Latest: <Text style={styles.value}>{formatAmountWithSeparator(latest)} {currencyLabel}</Text></Text>
-          <Text style={styles.compactText}>Total: <Text style={styles.value}>{formatAmountWithSeparator(totalItemValue)} {currencyLabel}</Text></Text>
-        </View>
-  
-        {/* Footer */}
-        <View style={styles.compactFooter}>
           <Text
             style={[
-              styles.difference,
-              itemDifference >= 0 ? styles.positive : styles.negative,
+              styles.varPercentage,
+              itemPercentage >= 0 ? styles.positive : styles.negative,
             ]}
           >
-            {itemDifference >= 0 ? '+' : '-'}
-            {Math.abs(itemDifference).toFixed(2)} (
-            {itemDifference >= 0 ? '+' : '-'}
-            {Math.abs(itemPercentage).toFixed(2)}%)
+            {itemPercentage >= 0 ? '+' : ''}
+            {Math.abs(itemPercentage).toFixed(2)}%
           </Text>
+        </View>
+  
+        {/* Description */}
+        {item.description && <Text style={styles.description}>{item.description}</Text>}
+  
+        {/* Main Content */}
+        <View style={styles.cardContent}>
+          {/* Row 1: Total & Amount */}
+          <View style={styles.row}>
+            <Text style={styles.rowText}>
+              Total: {currencyLabel}
+              {formatAmountWithSeparator(totalItemValue)} (
+              <Text
+                style={itemDifference >= 0 ? styles.positive : styles.negative}
+              >
+                {itemDifference >= 0 ? '+' : ''}
+                {formatAmountWithSeparator(itemDifference)}
+              </Text>
+              )
+            </Text>
+            <Text style={styles.rowText}>Amount: {item.amount}</Text>
+          </View>
+  
+          {/* Row 2: Latest & PPC */}
+          <View style={styles.row}>
+            <Text style={styles.rowText}>
+              Latest: {currencyLabel}
+              {formatAmountWithSeparator(latest)}
+            </Text>
+            <Text style={styles.rowText}>
+              PPC: {currencyLabel}
+              {formatAmountWithSeparator(ppc)}
+            </Text>
+          </View>
         </View>
       </View>
     );
   };
+  
 
   // 8) Main UI Render
   return (
-    <View style={styles.container}>
-      {/* Card for total value & performance */}
-      <View style={styles.card}>
-        <Text style={styles.valueTitle}>
-          {showInARS ? 'Total (ARS)' : 'Total (USD)'}
-        </Text>
-        <Text style={styles.valueAmount}>
-          {formatAmountWithSeparator(currentTotal)}
-        </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Card for total value & performance */}
+        <View style={styles.card}>
+          <Text style={styles.valueTitle}>
+            {showInARS ? 'Total (ARS)' : 'Total (USD)'}
+          </Text>
+          <Text style={styles.valueAmount}>
+            {formatAmountWithSeparator(currentTotal)}
+          </Text>
 
-        {/* Performance difference & percent */}
-        <Text
-          style={[
-            styles.performance,
-            { color: difference >= 0 ? '#008000' : '#ff0000' },
-          ]}
-        >
-          {difference >= 0 ? '+' : '-'}
-          {Math.abs(difference).toFixed(2)} (
-          {difference >= 0 ? '+' : '-'}
-          {Math.abs(percentage).toFixed(2)}%)
-        </Text>
+          {/* Performance difference & percent */}
+          <Text
+            style={[
+              styles.performance,
+              { color: difference >= 0 ? '#008000' : '#ff0000' },
+            ]}
+          >
+            {difference >= 0 ? '+' : '-'}
+            {formatAmountWithSeparator(Math.abs(difference))} (
+            {difference >= 0 ? '+' : '-'}
+            {formatAmountWithSeparator(Math.abs(percentage))}%)
+          </Text>
 
-        {/* Switch between ARS and USD */}
-        <View style={styles.switchRow}>
-          <Text>Show in ARS</Text>
-          <Switch value={showInARS} onValueChange={(val) => setShowInARS(val)} />
+          {/* Switch between ARS and USD */}
+          <View style={styles.switchRow}>
+            <Text>Show in ARS</Text>
+            <Switch value={showInARS} onValueChange={(val) => setShowInARS(val)} />
+          </View>
+
+          {/* Refresh Prices Button */}
+          <Pressable style={styles.refreshButton} onPress={handleRefreshPrices}>
+            <Text style={styles.refreshButtonText}>Refresh Prices</Text>
+          </Pressable>
         </View>
 
-        {/* Refresh Prices Button */}
-        <Pressable style={styles.refreshButton} onPress={handleRefreshPrices}>
-          <Text style={styles.refreshButtonText}>Refresh Prices</Text>
-        </Pressable>
+        {/* Portfolio list */}
+        <FlatList
+          data={portfolio}
+          keyExtractor={(item) => item.symbol}
+          renderItem={renderPortfolioItem}
+          contentContainerStyle={{ paddingBottom: 16 }}
+        />
       </View>
-
-      {/* Portfolio list */}
-      <FlatList
-        data={portfolio}
-        keyExtractor={(item) => item.symbol}
-        renderItem={renderPortfolioItem}
-        contentContainerStyle={{ padding: 16 }}
-      />
-    </View>
+    </SafeAreaView>
   );
 };
+
 
 export default SavingsScreen;
 
@@ -234,10 +267,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  safeArea: {
+    flex: 2,
+    backgroundColor: '#f2f2f2', // Matches your app's background color
+  },
   container: {
     flex: 1,
     backgroundColor: '#f2f2f2',
-    paddingTop: 40,
+    paddingTop: 16, // Adds some spacing below the notch
   },
   card: {
     backgroundColor: '#fff',
@@ -247,6 +284,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     elevation: 3,
   },
+
   valueTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -297,54 +335,50 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-
+  // Portfolio card styles
   compactCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 0,
     padding: 12,
-    marginBottom: 8,
+    marginVertical: 0,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 2,
   },
-  compactHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   symbol: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
+  varPercentage: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   description: {
     fontSize: 12,
-    color: '#777',
-  },
-  compactContentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    color: '#999',
     marginBottom: 4,
   },
-  compactText: {
+  cardContent: {
+    marginTop: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  rowText: {
     fontSize: 12,
     color: '#444',
-  },
-  value: {
-    fontWeight: '600',
-    color: '#000',
-  },
-  compactFooter: {
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 4,
-  },
-  difference: {
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   positive: {
     color: '#4CAF50',

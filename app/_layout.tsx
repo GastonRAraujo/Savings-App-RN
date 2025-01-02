@@ -2,8 +2,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { loadDatabase } from './database';
@@ -19,6 +20,7 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
   // Hide splash screen once both fonts and database are loaded
   useEffect(() => {
     if (fontsLoaded) {
@@ -46,6 +48,8 @@ export default function RootLayout() {
             <Stack.Screen name="+not-found" />
           </Stack>
         </SQLiteProvider>
+        {/* Add Toast Component */}
+        <Toast />
       </ThemeProvider>
     </GestureHandlerRootView>
   );

@@ -71,7 +71,7 @@ export default function SettingsScreen() {
             <TextInput
               placeholder="Password"
               style={styles.input}
-            //   secureTextEntry
+              secureTextEntry
               value={password}
               onChangeText={setPassword}
             />
