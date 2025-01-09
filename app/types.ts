@@ -41,6 +41,7 @@ export interface PortfolioValue {
 export interface PortfolioItem {
   symbol: string;
   description: string;
+  type: string;
   amount: number;
   ppcARS: number;
   ppcUSD: number;

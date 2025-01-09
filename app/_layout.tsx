@@ -8,7 +8,7 @@ import Toast from 'react-native-toast-message';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { loadDatabase } from './database';
-import { SQLiteProvider } from 'expo-sqlite/next';
+import { SQLiteProvider } from 'expo-sqlite';
 import { ActivityIndicator, View, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -18,6 +18,10 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({
+    Roboto: require('../assets/fonts/Roboto-Regular.ttf'),
+    RobotoMedium: require('../assets/fonts/Roboto-Medium.ttf'),
+    Roboto2014: require('../assets/fonts/Roboto-Regular-2014.ttf'),
+    OpenSans: require('../assets/fonts/OpenSans-Regular.ttf'),
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
@@ -48,7 +52,6 @@ export default function RootLayout() {
             <Stack.Screen name="+not-found" />
           </Stack>
         </SQLiteProvider>
-        {/* Add Toast Component */}
         <Toast />
       </ThemeProvider>
     </GestureHandlerRootView>

@@ -2,7 +2,6 @@ import axios from 'axios';
 import qs from 'qs';
 import * as SecureStore from 'expo-secure-store';
 import dolarMEP from './DolarMEP';
-import { act } from 'react-test-renderer';
 
 class IOLService {
     client: any;
@@ -90,7 +89,7 @@ class IOLService {
             const exchangeRate = await dolarMEP.fetchMEPExchangeRate();  // Fetch exchange rate
 
             return response.data.activos.map((activo: any) => {
-                if (['ObligacionesNegociables', 'TitulosPublicos'].includes(activo.titulo.tipo)
+                if (['ObligacionesNegociables', 'TitulosPublicos', 'Letras'].includes(activo.titulo.tipo)
                     && activo.titulo.moneda.toLowerCase().includes('peso')) {
                     activo.ppc = activo.ppc / 100;
                     activo.ultimoPrecio = activo.ultimoPrecio / 100;

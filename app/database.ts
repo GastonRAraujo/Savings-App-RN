@@ -3,64 +3,86 @@ import iolService from "../services/IolService";
 
 export async function loadDatabase(db: SQLiteDatabase) {
   await db.execAsync(`
-  PRAGMA journal_mode = 'wal';
-  CREATE TABLE IF NOT EXISTS Expenses(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    amountUSD REAL NOT NULL,
-    amountARS REAL NOT NULL,
-    date TEXT NOT NULL
-);
+    PRAGMA journal_mode = 'wal';
 
-CREATE TABLE IF NOT EXISTS Income(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    amountUSD REAL NOT NULL,
-    amountARS REAL NOT NULL,
-    date TEXT NOT NULL
-);
+    -- Ensure the Expenses table exists
+    CREATE TABLE IF NOT EXISTS Expenses(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amountUSD REAL NOT NULL,
+      amountARS REAL NOT NULL,
+      date TEXT NOT NULL
+    );
 
-CREATE TABLE IF NOT EXISTS GrossIncome(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    amountUSD REAL NOT NULL,
-    amountARS REAL NOT NULL,
-    date TEXT NOT NULL
-);
+    -- Ensure the Income table exists
+    CREATE TABLE IF NOT EXISTS Income(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amountUSD REAL NOT NULL,
+      amountARS REAL NOT NULL,
+      date TEXT NOT NULL
+    );
 
-CREATE TABLE IF NOT EXISTS Portfolio(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    description TEXT NOT NULL,
-    type TEXT NOT NULL,
-    amount REAL NOT NULL,
-    ppcARS REAL NOT NULL,
-    ppcUSD REAL NOT NULL,
-    lastPriceARS REAL NOT NULL,
-    lastPriceUSD REAL NOT NULL,
-    date TEXT NOT NULL
-);
+    -- Ensure the GrossIncome table exists
+    CREATE TABLE IF NOT EXISTS GrossIncome(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amountUSD REAL NOT NULL,
+      amountARS REAL NOT NULL,
+      date TEXT NOT NULL
+    );
 
-CREATE TABLE IF NOT EXISTS PortfolioValue(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    priceUSD REAL NOT NULL,
-    priceARS REAL NOT NULL,
-    date TEXT NOT NULL
-);
+    -- Ensure the Portfolio table exists
+    CREATE TABLE IF NOT EXISTS Portfolio(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      description TEXT NOT NULL,
+      type TEXT NOT NULL,
+      amount REAL NOT NULL,
+      ppcARS REAL NOT NULL,
+      ppcUSD REAL NOT NULL,
+      lastPriceARS REAL NOT NULL,
+      lastPriceUSD REAL NOT NULL,
+      date TEXT NOT NULL
+    );
 
-CREATE TABLE IF NOT EXISTS Operations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  numero INTEGER,
-  fecha TEXT,
-  tipo TEXT,
-  simbolo TEXT,
-  cantidad REAL,
-  priceARS REAL,
-  priceUSD REAL
-);
+    -- Ensure the PortfolioValue table exists
+    CREATE TABLE IF NOT EXISTS PortfolioValue(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      priceUSD REAL NOT NULL,
+      priceARS REAL NOT NULL,
+      date TEXT NOT NULL
+    );
+
+    -- Ensure the Operations table exists
+    CREATE TABLE IF NOT EXISTS Operations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero INTEGER,
+      fecha TEXT,
+      tipo TEXT,
+      simbolo TEXT,
+      cantidad REAL,
+      priceARS REAL,
+      priceUSD REAL
+    );
   `);
-  console.log("Database loaded");
 
-};
+  // Check if the openPosition column exists and add it if necessary
+  const columns = await db.getAllAsync(`
+    PRAGMA table_info(Portfolio);
+  `);
+
+  const hasOpenPositionColumn = columns.some((column: any) => column.name === 'openPosition');
+
+  if (!hasOpenPositionColumn) {
+    await db.execAsync(`
+      ALTER TABLE Portfolio ADD COLUMN openPosition BOOLEAN DEFAULT 0;
+    `);
+    console.log("Added 'openPosition' column to Portfolio table");
+  }
+
+  console.log("Database loaded");
+}
+
 
 
 //////////////////////////////////////////////////////////////

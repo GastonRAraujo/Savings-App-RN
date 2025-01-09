@@ -183,8 +183,25 @@ export async function refreshPortfolioPrices(db: any) {
     if (freshInfo) {
       // Directly store freshInfo.ppcARS / ppcUSD -> lastPriceARS / lastPriceUSD
       await db.runAsync(
-        'UPDATE Portfolio SET lastPriceARS = ?, lastPriceUSD = ? WHERE symbol = ?',
-        [freshInfo.latestPriceARS, freshInfo.latestPriceUSD, row.symbol]
+        'UPDATE Portfolio SET lastPriceARS = ?, lastPriceUSD = ?, openPosition = ? WHERE symbol = ?',
+        [freshInfo.latestPriceARS, freshInfo.latestPriceUSD, true, row.symbol]
+      );
+    } else {
+      // Mark as closed position if not found in fresh data
+      await db.runAsync(
+        'UPDATE Portfolio SET openPosition = ? WHERE symbol = ?',
+        [false, row.symbol]
+      );
+    }
+  }
+
+  // 4. Insert new elements from iolData that are not in localRows
+  for (const freshInfo of iolData) {
+    const localRow = localRows.find((row: any) => row.symbol === freshInfo.symbol);
+    if (!localRow) {
+      await db.runAsync(
+        'INSERT INTO Portfolio (symbol, lastPriceARS, lastPriceUSD, openPosition) VALUES (?, ?, ?, ?)',
+        [freshInfo.symbol, freshInfo.latestPriceARS, freshInfo.latestPriceUSD, true]
       );
     }
   }

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, Modal, TextInput, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TextInput, Pressable, ScrollView } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import dolarMEP from '@/services/DolarMEP'; // Import your MEP service
 import { Income } from '../types';
 import IncomeList from '@/components/IncomeList';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AndroidSafeAreaStyle } from '@/components/SafeViewAndroid';
 
 const formatAmountWithSeparator = (amount?: number) => {
   if (!amount) return '0.00';
@@ -173,9 +175,9 @@ export default function IncomeScreen() {
   // 8. Render
   ///////////////////////////////////////////////////////////////////////////
   return (
+    <SafeAreaView style={AndroidSafeAreaStyle()}>
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.dashboard}>
-        <Text></Text>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Total Income (Net)</Text>
           <Text style={styles.cardAmount}>${formatAmountWithSeparator(totalIncomeUSD)} USD</Text>
@@ -247,6 +249,7 @@ export default function IncomeScreen() {
         </View>
       </Modal>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 

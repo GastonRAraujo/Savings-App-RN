@@ -100,7 +100,7 @@ export async function getPreviousPortfolioValue(db: any): Promise<PortfolioValue
 export async function getAllPortfolioItems(db: any): Promise<PortfolioItem[]> {
   try {
     const query = `
-      SELECT symbol, amount, ppcARS, ppcUSD, lastPriceARS, lastPriceUSD, date, description
+      SELECT symbol, amount, ppcARS, ppcUSD, lastPriceARS, lastPriceUSD, date, description, type
       FROM Portfolio
       ORDER BY symbol ASC
     `;
@@ -114,6 +114,7 @@ export async function getAllPortfolioItems(db: any): Promise<PortfolioItem[]> {
       lastPriceUSD: row.lastPriceUSD,
       date: row.date,
       description: row.description,
+      type: row.type,
     }));
   } catch (error) {
     console.error('Error getting portfolio items:', error);
