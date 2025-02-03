@@ -200,9 +200,29 @@ export async function refreshPortfolioPrices(db: any) {
     const localRow = localRows.find((row: any) => row.symbol === freshInfo.symbol);
     if (!localRow) {
       await db.runAsync(
-        'INSERT INTO Portfolio (symbol, lastPriceARS, lastPriceUSD, openPosition) VALUES (?, ?, ?, ?)',
-        [freshInfo.symbol, freshInfo.latestPriceARS, freshInfo.latestPriceUSD, true]
-      );
+        `INSERT INTO Portfolio (
+            symbol, 
+            description, 
+            type, 
+            amount, 
+            ppcARS, 
+            ppcUSD, 
+            lastPriceARS, 
+            lastPriceUSD, 
+            date
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          freshInfo.symbol,
+          freshInfo.description,
+          freshInfo.type,
+          freshInfo.amount,
+          freshInfo.ppcARS,
+          freshInfo.ppcUSD,
+          freshInfo.latestPriceARS,
+          freshInfo.latestPriceUSD,
+          new Date().toISOString() // or another appropriate date value
+        ]
+      );      
     }
   }
 }

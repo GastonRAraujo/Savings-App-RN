@@ -26,8 +26,12 @@ import {
 
 import { PortfolioValue, PortfolioItem } from '@/app/types';
 
+// Import Ionicons for the eye icon
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useHideNumbers } from '../HideNumbersContext';
+
 const formatAmountWithSeparator = (amount?: number, precision: number = 2) => {
-  if (!amount) return '0.00';
+  if (amount == null) return '0.00';
   // Ensure only two decimals, then format with locale separator
   return new Intl.NumberFormat('es-AR').format(parseFloat(amount.toFixed(precision)));
 };
@@ -45,6 +49,8 @@ const SavingsScreen = () => {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [showInARS, setShowInARS] = useState(true);
   const [selectedType, setSelectedType] = useState('All'); // Track selected type
+  // Shared state to toggle hiding numbers
+  const { hideNumbers, setHideNumbers } = useHideNumbers();
 
   const itemTypes = [
     { key: 'All', label: 'All' },
@@ -121,7 +127,6 @@ const SavingsScreen = () => {
     }
   }
   
-
   // 5) If loading or error, show feedback
   if (loading) {
     return (
@@ -212,7 +217,7 @@ const SavingsScreen = () => {
             ]}
           >
             {itemPercentage >= 0 ? '+' : ''}
-            {Math.abs(itemPercentage).toFixed(2)}%
+            {hideNumbers ? '****' : Math.abs(itemPercentage).toFixed(2)}%
           </Text>
         </View>
   
@@ -224,27 +229,29 @@ const SavingsScreen = () => {
           {/* Row 1: Total & Amount */}
           <View style={styles.row}>
             <Text style={styles.rowText}>
-              Total: {currencyLabel}
-              {formatAmountWithSeparator(totalItemValue)} (
+              Total: {currencyLabel}{' '}
+              {hideNumbers ? '****' : formatAmountWithSeparator(totalItemValue)} (
               <Text
                 style={itemDifference >= 0 ? styles.positive : styles.negative}
               >
                 {itemDifference >= 0 ? '+' : ''}
-                {formatAmountWithSeparator(itemDifference)}
+                {hideNumbers ? '****' : formatAmountWithSeparator(itemDifference)}
               </Text>
               )
             </Text>
-            <Text style={styles.rowText}>Amount: {item.amount}</Text>
+            <Text style={styles.rowText}>
+              Amount: {hideNumbers ? '****' : item.amount}
+            </Text>
           </View>
   
           {/* Row 2: Latest & PPC */}
           <View style={styles.row}>
             <Text style={styles.rowText}>
-              Latest: {currencyLabel}
+              Latest: {currencyLabel}{' '}
               {formatAmountWithSeparator(latest)}
             </Text>
             <Text style={styles.rowText}>
-              PPC: {currencyLabel}
+              PPC: {currencyLabel}{' '}
               {formatAmountWithSeparator(ppc)}
             </Text>
           </View>
@@ -252,77 +259,90 @@ const SavingsScreen = () => {
       </View>
     );
   };
-  
 
   // 8) Main UI Render
   return (
     <SafeAreaView style={AndroidSafeAreaStyle()}>
       <View style={styles.card}>
-      {/* Portfolio Total */}
-      <View style={styles.cardHeader}>
-        <Text style={styles.valueTitle}>Portfolio Total</Text>
+        {/* Portfolio Total */}
+        <View style={styles.cardHeader}>
+          <Text style={styles.valueTitle}>Portfolio Total</Text>
+          {/* Eye icon to toggle number visibility */}
+          <Pressable onPress={() => setHideNumbers(!hideNumbers)}>
+            <Ionicons name={hideNumbers ? "eye-off" : "eye"} size={24} color="gray" />
+          </Pressable>
+        </View>
         <Text style={styles.valueAmount}>
           {showInARS ? 'ARS ' : 'USD '}
-          {formatAmountWithSeparator(
-            showInARS ? currentPortfolioValue?.priceARS : currentPortfolioValue?.priceUSD
-          )}
+          {hideNumbers
+            ? '****'
+            : formatAmountWithSeparator(
+                showInARS ? currentPortfolioValue?.priceARS : currentPortfolioValue?.priceUSD
+              )}
         </Text>
-      </View>
 
-      {/* Performance */}
-      <View style={styles.rowCompact}>
-        <Text style={[styles.performance, { color: difference >= 0 ? '#008000' : '#ff0000' }]}>
-          {difference >= 0 ? '+' : '-'}
-          {formatAmountWithSeparator(Math.abs(difference))} (
-          {difference >= 0 ? '+' : '-'}
-          {Math.abs(percentage).toFixed(2)}%)
-        </Text>
-      </View>
-
-      {/* Selected Category Total, Percentage, and Performance */}
-      {selectedType !== 'All' && (
-        <>
-          <View style={styles.rowCompact}>
-            <Text style={styles.categoryValue}>
-              {`${itemTypes.find((t) => t.key === selectedType)?.label}: ${
-                showInARS ? 'AR$' : 'U$D'
-              } ${formatAmountWithSeparator(selectedCategoryTotal, 0)}`}
-            </Text>
-          </View>
-          <View style={styles.rowCompact}>
-            <Text style={styles.categoryPercentage}>
-              {`(${selectedCategoryPercentage.toFixed(2)}% of portfolio)`}
-            </Text>
-            <Text
-              style={[
-                styles.categoryPerformance,
-                { color: selectedCategoryDifference >= 0 ? '#008000' : '#ff0000' },
-              ]}
-            >
-              {selectedCategoryDifference >= 0 ? '+' : '-'}
-              {formatAmountWithSeparator(Math.abs(selectedCategoryDifference))} (
-              {selectedCategoryDifference >= 0 ? '+' : '-'}
-              {Math.abs(selectedCategoryPerformancePercentage).toFixed(2)}%)
-            </Text>
-          </View>
-        </>
-      )}
-
-      {/* Switch and Refresh */}
-      <View style={styles.switchRowCompact}>
-        <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>USD</Text>
-          <Switch value={showInARS} onValueChange={(val) => setShowInARS(val)} />
-          <Text style={styles.switchLabel}>ARS</Text>
+        {/* Performance */}
+        <View style={styles.rowCompact}>
+          <Text style={[styles.performance, { color: difference >= 0 ? '#008000' : '#ff0000' }]}>
+            {difference >= 0 ? '+' : '-'}
+            {hideNumbers
+              ? '****'
+              : formatAmountWithSeparator(Math.abs(difference))} (
+            {difference >= 0 ? '+' : '-'}
+            {hideNumbers ? '****' : Math.abs(percentage).toFixed(2)}%)
+          </Text>
         </View>
-        <Pressable style={styles.refreshButton} onPress={handleRefreshPrices}>
-          <Text style={styles.refreshButtonText}>Refresh</Text>
-        </Pressable>
-      </View>
-    </View>
 
-        {/* Type Selection */}
-        <View style={styles.typeSelectorContainer}>
+        {/* Selected Category Total, Percentage, and Performance */}
+        {selectedType !== 'All' && (
+          <>
+            <View style={styles.rowCompact}>
+              <Text style={styles.categoryValue}>
+                {`${itemTypes.find((t) => t.key === selectedType)?.label}: ${
+                  showInARS ? 'AR$' : 'U$D'
+                } `}
+                {hideNumbers ? '****' : formatAmountWithSeparator(selectedCategoryTotal, 0)}
+              </Text>
+            </View>
+            <View style={styles.rowCompact}>
+              <Text style={styles.categoryPercentage}>
+                {`(${selectedCategoryPercentage.toFixed(2)}% of portfolio)`}
+              </Text>
+              <Text
+                style={[
+                  styles.categoryPerformance,
+                  { color: selectedCategoryDifference >= 0 ? '#008000' : '#ff0000' },
+                ]}
+              >
+                {selectedCategoryDifference >= 0 ? '+' : '-'}
+                {hideNumbers
+                  ? '****'
+                  : formatAmountWithSeparator(Math.abs(selectedCategoryDifference))} (
+                {selectedCategoryDifference >= 0 ? '+' : '-'}
+                {hideNumbers
+                  ? '****'
+                  : Math.abs(selectedCategoryPerformancePercentage).toFixed(2)}
+                %)
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* Switch and Refresh */}
+        <View style={styles.switchRowCompact}>
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>USD</Text>
+            <Switch value={showInARS} onValueChange={(val) => setShowInARS(val)} />
+            <Text style={styles.switchLabel}>ARS</Text>
+          </View>
+          <Pressable style={styles.refreshButton} onPress={handleRefreshPrices}>
+            <Text style={styles.refreshButtonText}>Refresh</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Type Selection */}
+      <View style={styles.typeSelectorContainer}>
         <FlatList
           data={itemTypes}
           horizontal
@@ -350,8 +370,8 @@ const SavingsScreen = () => {
         />
       </View>
 
-        {/* Portfolio list */}
-        <View style={styles.cardContainer}>
+      {/* Portfolio list */}
+      <View style={styles.cardContainer}>
         <FlatList
           data={filteredPortfolio}
           keyExtractor={(item) => item.symbol}
@@ -363,12 +383,10 @@ const SavingsScreen = () => {
             </View>
           }
         />
-        </View>
+      </View>
     </SafeAreaView>
   );
 };
-
-
 
 export default SavingsScreen;
 
@@ -461,7 +479,7 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 12,
     color: '#444',
-    fontWeight: '800', // Bolder for better readability
+    fontWeight: '800',
     marginHorizontal: 4,
   },
   refreshButton: {
@@ -478,9 +496,9 @@ const styles = StyleSheet.create({
 
   // Type Selector Styles
   typeSelectorContainer: {
-    height: 40, // Fixed height for type selector
+    height: 40,
     justifyContent: 'center',
-    backgroundColor: '#f8f8f8', // Background color for the type selector
+    backgroundColor: '#f8f8f8',
   },
   typeList: {
     paddingHorizontal: 16,
@@ -493,7 +511,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
   typeItemSelected: {
-    backgroundColor: '#007bff', // Selected type background
+    backgroundColor: '#007bff',
   },
   typeText: {
     fontSize: 14,
@@ -501,13 +519,13 @@ const styles = StyleSheet.create({
     color: '#444',
   },
   typeTextSelected: {
-    color: '#fff', // Selected type text color
+    color: '#fff',
     fontWeight: 'bold',
   },
 
   // Cards Container
   cardsContainer: {
-    flex: 1, // Occupies remaining space
+    flex: 1,
   },
 
   // Portfolio Item Card Styles
@@ -579,4 +597,3 @@ const styles = StyleSheet.create({
     color: '#F44336',
   },
 });
-

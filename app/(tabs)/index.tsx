@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable } from 'react-native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
 import { useSQLiteContext } from 'expo-sqlite';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useHideNumbers } from '../HideNumbersContext';
 
 // Define types for the data
 type PortfolioValueRow = {
@@ -25,6 +27,7 @@ const HomeScreen = () => {
   const [summary, setSummary] = useState<PortfolioValueRow>({ priceUSD: 0, priceARS: 0 });
   const [monthlyData, setMonthlyData] = useState<MonthlyValueRow[]>([]);
   const [typeSummary, setTypeSummary] = useState<PortfolioTypeSummary[]>([]);
+  const { hideNumbers, setHideNumbers } = useHideNumbers();
 
   useEffect(() => {
     if (db) {
@@ -40,7 +43,6 @@ const HomeScreen = () => {
       const latestResult: PortfolioValueRow[] = await db.getAllAsync(
         `SELECT priceUSD, priceARS FROM PortfolioValue ORDER BY date DESC LIMIT 1;`
       );
-
       if (latestResult.length > 0) {
         const latest: PortfolioValueRow = latestResult[0];
         setSummary(latest);
@@ -55,7 +57,6 @@ const HomeScreen = () => {
          GROUP BY month
          ORDER BY date ASC;`
       );
-
       if (monthlyResult.length > 0) {
         const monthlyValues = monthlyResult.map((row: any): MonthlyValueRow => ({
           month: row.month,
@@ -72,7 +73,6 @@ const HomeScreen = () => {
          FROM Portfolio 
          GROUP BY type;`
       );
-
       if (typeResult.length > 0) {
         const typeValues = typeResult.map((row: any): PortfolioTypeSummary => ({
           type: row.type,
@@ -98,33 +98,49 @@ const HomeScreen = () => {
     );
   }
 
+  // Prepare chart data for the line chart
   const chartLabels = monthlyData.map((row) => row.month || 'N/A');
-  const chartData = monthlyData.map((row) => row.priceUSD || 0);
+  let chartData: number[] = [];
+  let yAxisLabel = "$";
 
-  // Predefined color palette
+  if (hideNumbers) {
+    // If numbers are hidden, convert monthly values to % change relative to the first month.
+    if (monthlyData.length > 0) {
+      const base = monthlyData[0].priceUSD;
+      chartData = monthlyData.map((row) =>
+        base !== 0 ? ((row.priceUSD - base) / base) * 100 : 0
+      );
+    }
+    yAxisLabel = "%";
+  } else {
+    chartData = monthlyData.map((row) => row.priceUSD || 0);
+  }
+
+  // Predefined color palette for the pie chart
   const colorPalette = ['#4CAF50', '#FFC107', '#2196F3', '#FF5722', '#9C27B0', '#00BCD4'];
-
-  // Pie chart data
   const pieChartData = typeSummary.map((type, index) => ({
     name: type.type,
     value: type.valueUSD,
-    color: colorPalette[index % colorPalette.length], // Cycle through the palette
+    color: colorPalette[index % colorPalette.length],
     legendFontColor: '#333',
     legendFontSize: 12,
   }));
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <Text style={styles.header}>Savings Overview</Text>
-
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Total Savings (USD)</Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Total Savings (USD)</Text>
+          <Pressable onPress={() => setHideNumbers(!hideNumbers)}>
+            <Ionicons name={hideNumbers ? "eye-off" : "eye"} size={24} color="gray" />
+          </Pressable>
+        </View>
         <Text style={styles.cardValue}>
-          ${summary.priceUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          ${hideNumbers ? '****' : summary.priceUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
         </Text>
         <Text style={styles.cardTitle}>Total Savings (ARS)</Text>
         <Text style={styles.cardValue}>
-          AR$ {summary.priceARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          AR$ {hideNumbers ? '****' : summary.priceARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
         </Text>
       </View>
 
@@ -151,19 +167,17 @@ const HomeScreen = () => {
 
       {chartData.length > 0 ? (
         <>
-          <Text style={styles.chartTitle}>Monthly Portfolio Values (USD)</Text>
+          <Text style={styles.chartTitle}>
+            {hideNumbers ? "Monthly Portfolio % Change" : "Monthly Portfolio Values (USD)"}
+          </Text>
           <LineChart
             data={{
               labels: chartLabels,
-              datasets: [
-                {
-                  data: chartData,
-                },
-              ],
+              datasets: [{ data: chartData }],
             }}
             width={350} // Chart width
             height={220} // Chart height
-            yAxisLabel="$"
+            yAxisLabel={yAxisLabel}
             chartConfig={{
               backgroundColor: '#ffffff',
               backgroundGradientFrom: '#f2f2f2',
@@ -195,13 +209,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
   },
-  header: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -212,6 +219,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   cardTitle: {
     fontSize: 16,
