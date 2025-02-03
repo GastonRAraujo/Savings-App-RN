@@ -6,6 +6,8 @@ import { Income } from '../types';
 import IncomeList from '@/components/IncomeList';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AndroidSafeAreaStyle } from '@/components/SafeViewAndroid';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useHideNumbers } from '../HideNumbersContext';
 
 const formatAmountWithSeparator = (amount?: number) => {
   if (!amount) return '0.00';
@@ -31,6 +33,9 @@ export default function IncomeScreen() {
     sellRate: number;
     updatedAt: string;
   } | null>(null);
+
+  // Shared hideNumbers state from context
+  const { hideNumbers, setHideNumbers } = useHideNumbers();
 
   ///////////////////////////////////////////////////////////////////////////
   // 1. Load Data and MEP Rate
@@ -175,81 +180,95 @@ export default function IncomeScreen() {
   // 8. Render
   ///////////////////////////////////////////////////////////////////////////
   return (
-    <SafeAreaView style={AndroidSafeAreaStyle()}>
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.dashboard}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Total Income (Net)</Text>
-          <Text style={styles.cardAmount}>${formatAmountWithSeparator(totalIncomeUSD)} USD</Text>
-          <Text style={styles.cardAmount}>${formatAmountWithSeparator(totalIncomeARS)} ARS</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Gross Income (Latest)</Text>
-          <Text style={styles.cardAmount}>
-            USD: ${formatAmountWithSeparator(grossIncome?.amountUSD) ?? '0.00'}
-          </Text>
-          <Text style={styles.cardAmount}>
-            ARS: ${formatAmountWithSeparator(grossIncome?.amountARS) ?? '0.00'}
-          </Text>
-
-          <View style={styles.buttonRow}>
-            <Pressable style={styles.button} onPress={() => openModal('add')}>
-              <Text style={styles.buttonText}>Add Extra</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.button, styles.secondaryButton]}
-              onPress={() => openModal('edit')}
-            >
-              <Text style={styles.buttonText}>Edit Salary</Text>
-            </Pressable>
-            <Pressable style={[styles.button, styles.thirdButton]} onPress={insertIncome}>
-              <Text style={styles.buttonText}>Receive Salary</Text>
-            </Pressable>
+    // <SafeAreaView style={AndroidSafeAreaStyle()}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.dashboard}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Total Income (Net)</Text>
+              {/* Eye icon to toggle hideNumbers */}
+              <Pressable onPress={() => setHideNumbers(!hideNumbers)}>
+                <Ionicons name={hideNumbers ? "eye-off" : "eye"} size={24} color="gray" />
+              </Pressable>
+            </View>
+            <Text style={styles.cardAmount}>
+              {hideNumbers
+                ? '****'
+                : `$${formatAmountWithSeparator(totalIncomeUSD)} USD`}
+            </Text>
+            <Text style={styles.cardAmount}>
+              {hideNumbers
+                ? '****'
+                : `$${formatAmountWithSeparator(totalIncomeARS)} ARS`}
+            </Text>
           </View>
-        </View>
-      </View>
 
-      <IncomeList incomes={incomes} deleteIncome={deleteIncome} />
-
-      <Modal visible={isModalVisible} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {modalType === 'add' ? 'Add Bonus/Refund' : 'Edit Gross Income'}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Gross Income (Latest)</Text>
+            <Text style={styles.cardAmount}>
+              USD: {hideNumbers ? '****' : `$${formatAmountWithSeparator(grossIncome?.amountUSD) ?? '0.00'}`}
+            </Text>
+            <Text style={styles.cardAmount}>
+              ARS: {hideNumbers ? '****' : `$${formatAmountWithSeparator(grossIncome?.amountARS) ?? '0.00'}`}
             </Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Amount in USD"
-              keyboardType="numeric"
-              value={amountUSD}
-              onChangeText={handleChangeUSD}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Amount in ARS"
-              keyboardType="numeric"
-              value={amountARS}
-              onChangeText={handleChangeARS}
-            />
-
             <View style={styles.buttonRow}>
-              <Pressable style={styles.button} onPress={handleSave}>
-                <Text style={styles.buttonText}>Save</Text>
+              <Pressable style={styles.button} onPress={() => openModal('add')}>
+                <Text style={styles.buttonText}>Add Extra</Text>
               </Pressable>
               <Pressable
                 style={[styles.button, styles.secondaryButton]}
-                onPress={() => setIsModalVisible(false)}
+                onPress={() => openModal('edit')}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={styles.buttonText}>Edit Salary</Text>
+              </Pressable>
+              <Pressable style={[styles.button, styles.thirdButton]} onPress={insertIncome}>
+                <Text style={styles.buttonText}>Receive Salary</Text>
               </Pressable>
             </View>
           </View>
         </View>
-      </Modal>
-    </ScrollView>
-    </SafeAreaView>
+
+        <IncomeList incomes={incomes} deleteIncome={deleteIncome} />
+
+        <Modal visible={isModalVisible} transparent animationType="slide">
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {modalType === 'add' ? 'Add Bonus/Refund' : 'Edit Gross Income'}
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Amount in USD"
+                keyboardType="numeric"
+                value={amountUSD}
+                onChangeText={handleChangeUSD}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Amount in ARS"
+                keyboardType="numeric"
+                value={amountARS}
+                onChangeText={handleChangeARS}
+              />
+
+              <View style={styles.buttonRow}>
+                <Pressable style={styles.button} onPress={handleSave}>
+                  <Text style={styles.buttonText}>Save</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.button, styles.secondaryButton]}
+                  onPress={() => setIsModalVisible(false)}
+                >
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    /* </SafeAreaView> */
   );
 }
 
@@ -270,6 +289,12 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+  cardHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 10 
+  },
   cardTitle: { fontSize: 18, fontWeight: '600', marginBottom: 10, color: '#555' },
   cardAmount: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 5 },
   buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 },
@@ -282,12 +307,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  secondaryButton: {
-    backgroundColor: '#6c757d',
-  },
-  thirdButton: {
-    backgroundColor: '#00A859',
-  },
+  secondaryButton: { backgroundColor: '#6c757d' },
+  thirdButton: { backgroundColor: '#00A859' },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 14, textAlign: 'center' },
   modalContainer: {
     flex: 1,
@@ -316,3 +337,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+

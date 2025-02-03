@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView } from 'react-native';
 import {
   View,
   Text,
   StyleSheet,
-  Switch,
+  Modal,
+  TextInput,
+  Pressable,
   FlatList,
   ActivityIndicator,
-  Pressable,
+  Switch,
 } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite'; // or however you access your DB
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSQLiteContext } from 'expo-sqlite';
 import Toast from 'react-native-toast-message';
 import { AndroidSafeAreaStyle } from '@/components/SafeViewAndroid';
 
@@ -26,31 +28,33 @@ import {
 
 import { PortfolioValue, PortfolioItem } from '@/app/types';
 
-// Import Ionicons for the eye icon
+// Import Ionicons and FontAwesome for icons
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { FontAwesome } from '@expo/vector-icons';
 import { useHideNumbers } from '../HideNumbersContext';
+
+// Import authentication service and portfolio initializer
+import iolService from '@/services/IolService';
+import { initializePortfolio } from '@/app/database'; // adjust path as needed
 
 const formatAmountWithSeparator = (amount?: number, precision: number = 2) => {
   if (amount == null) return '0.00';
-  // Ensure only two decimals, then format with locale separator
   return new Intl.NumberFormat('es-AR').format(parseFloat(amount.toFixed(precision)));
 };
 
-const SavingsScreen = () => {
-  // 1) Access the DB context
+export default function SavingsScreen() {
+  // Database and shared state
   const db = useSQLiteContext();
+  const { hideNumbers, setHideNumbers } = useHideNumbers();
 
-  // 2) Local state
+  // Portfolio data states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [currentPortfolioValue, setCurrentPortfolioValue] = useState<PortfolioValue | null>(null);
   const [previousPortfolioValue, setPreviousPortfolioValue] = useState<PortfolioValue | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [showInARS, setShowInARS] = useState(true);
-  const [selectedType, setSelectedType] = useState('All'); // Track selected type
-  // Shared state to toggle hiding numbers
-  const { hideNumbers, setHideNumbers } = useHideNumbers();
+  const [selectedType, setSelectedType] = useState('All');
 
   const itemTypes = [
     { key: 'All', label: 'All' },
@@ -62,30 +66,57 @@ const SavingsScreen = () => {
     { key: 'ObligacionesNegociables', label: 'ONs' },
   ];
 
-  // Filter portfolio items based on the selected type
-  const filteredPortfolio = selectedType === 'All'
-    ? portfolio
-    : portfolio.filter((item) => item.type === selectedType);
+  // Filter portfolio items based on selected type
+  const filteredPortfolio =
+    selectedType === 'All'
+      ? portfolio
+      : portfolio.filter((item) => item.type === selectedType);
 
-  // 3) Initial data load
+  // --- Sign-In Modal States and Handlers ---
+  const [isSignInVisible, setIsSignInVisible] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  function openSignInModal() {
+    setUsername('');
+    setPassword('');
+    setIsSignInVisible(true);
+  }
+
+  async function handleSignIn() {
+    if (!username || !password) {
+      alert('Please enter both username and password.');
+      return;
+    }
+    try {
+      console.log('username:', username);
+      console.log('password:', password);
+      await iolService.authenticate(username, password);
+      alert('Signed in successfully!');
+      setIsSignInVisible(false);
+      await initializePortfolio(db);
+    } catch (error) {
+      console.error('Sign In error:', error);
+      alert('Error signing in: ' + error);
+    }
+  }
+  // --- End Sign-In Modal ---
+
+  // --- Load Portfolio Data ---
   useEffect(() => {
     if (db) {
       loadData();
     }
   }, [db]);
 
-  // Helper: fetch everything from DB
   async function loadData() {
     try {
       setLoading(true);
-
-      // Get the current snapshot, previous snapshot, and portfolio items
       const [latestVal, prevVal, items] = await Promise.all([
         getLatestPortfolioValue(db),
         getPreviousPortfolioValue(db),
         getAllPortfolioItems(db),
       ]);
-
       setCurrentPortfolioValue(latestVal);
       setPreviousPortfolioValue(prevVal);
       setPortfolio(items);
@@ -96,8 +127,9 @@ const SavingsScreen = () => {
       setLoading(false);
     }
   }
+  // --- End Load Portfolio Data ---
 
-  // 4) Refresh prices from IOL, recalc portfolio value, then reload data
+  // --- Refresh Prices Handler ---
   async function handleRefreshPrices() {
     if (!db) return;
     try {
@@ -116,7 +148,6 @@ const SavingsScreen = () => {
         typeof err === 'object' && err !== null && 'message' in err
           ? String((err as any).message)
           : 'Something went wrong while refreshing prices.';
-    
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -126,8 +157,8 @@ const SavingsScreen = () => {
       setLoading(false);
     }
   }
-  
-  // 5) If loading or error, show feedback
+  // --- End Refresh Prices Handler ---
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -145,12 +176,11 @@ const SavingsScreen = () => {
     );
   }
 
-  // 6) Calculate performance using current and previous snapshots
+  // --- Calculate Portfolio Performance ---
   let currentTotal = 0;
   let previousTotal = 0;
   let difference = 0;
   let percentage = 0;
-
   if (currentPortfolioValue) {
     currentTotal = showInARS
       ? currentPortfolioValue.priceARS
@@ -164,47 +194,37 @@ const SavingsScreen = () => {
   difference = currentTotal - previousTotal;
   percentage = previousTotal !== 0 ? (difference / previousTotal) * 100 : 0;
 
-  // Calculate the total value of the selected category
   const selectedCategoryTotal = filteredPortfolio.reduce(
     (sum, item) =>
       sum +
-      item.amount *
-        (showInARS ? item.lastPriceARS : item.lastPriceUSD),
+      item.amount * (showInARS ? item.lastPriceARS : item.lastPriceUSD),
     0
   );
-
-  // Calculate the percentage of the total portfolio
   const selectedCategoryPercentage =
     currentTotal > 0 ? (selectedCategoryTotal / currentTotal) * 100 : 0;
-
-  // Calculate the previous total value of the selected category
   const selectedCategoryPreviousTotal = filteredPortfolio.reduce(
     (sum, item) =>
       sum +
-      item.amount *
-        (showInARS ? item.ppcARS : item.ppcUSD),
+      item.amount * (showInARS ? item.ppcARS : item.ppcUSD),
     0
   );
-
-  // Calculate performance values for the selected category
   const selectedCategoryDifference =
     selectedCategoryTotal - selectedCategoryPreviousTotal;
-
   const selectedCategoryPerformancePercentage =
     selectedCategoryPreviousTotal > 0
       ? (selectedCategoryDifference / selectedCategoryPreviousTotal) * 100
       : 0;
+  // --- End Portfolio Calculations ---
 
-  // 7) Render each portfolio item in the list
+  // --- Render Each Portfolio Item ---
   const renderPortfolioItem = ({ item }: { item: PortfolioItem }) => {
     const currencyLabel = showInARS ? 'AR$' : 'U$D';
     const ppc = showInARS ? item.ppcARS : item.ppcUSD;
     const latest = showInARS ? item.lastPriceARS : item.lastPriceUSD;
-  
     const totalItemValue = item.amount * latest;
     const itemDifference = latest - ppc;
     const itemPercentage = ppc !== 0 ? (itemDifference / ppc) * 100 : 0;
-  
+
     return (
       <View style={styles.compactCard}>
         {/* Header */}
@@ -220,20 +240,17 @@ const SavingsScreen = () => {
             {hideNumbers ? '****' : Math.abs(itemPercentage).toFixed(2)}%
           </Text>
         </View>
-  
+
         {/* Description */}
         {item.description && <Text style={styles.description}>{item.description}</Text>}
-  
+
         {/* Main Content */}
         <View style={styles.cardContent}>
-          {/* Row 1: Total & Amount */}
           <View style={styles.row}>
             <Text style={styles.rowText}>
               Total: {currencyLabel}{' '}
               {hideNumbers ? '****' : formatAmountWithSeparator(totalItemValue)} (
-              <Text
-                style={itemDifference >= 0 ? styles.positive : styles.negative}
-              >
+              <Text style={itemDifference >= 0 ? styles.positive : styles.negative}>
                 {itemDifference >= 0 ? '+' : ''}
                 {hideNumbers ? '****' : formatAmountWithSeparator(itemDifference)}
               </Text>
@@ -243,34 +260,75 @@ const SavingsScreen = () => {
               Amount: {hideNumbers ? '****' : item.amount}
             </Text>
           </View>
-  
-          {/* Row 2: Latest & PPC */}
           <View style={styles.row}>
             <Text style={styles.rowText}>
               Latest: {currencyLabel}{' '}
-              {formatAmountWithSeparator(latest)}
+              {hideNumbers ? '****' : formatAmountWithSeparator(latest)}
             </Text>
             <Text style={styles.rowText}>
               PPC: {currencyLabel}{' '}
-              {formatAmountWithSeparator(ppc)}
+              {hideNumbers ? '****' : formatAmountWithSeparator(ppc)}
             </Text>
           </View>
         </View>
       </View>
     );
   };
+  // --- End Render Portfolio Item ---
 
-  // 8) Main UI Render
+  // --- Main UI Render ---
   return (
     <SafeAreaView style={AndroidSafeAreaStyle()}>
+      {/* Sign-In Modal (for IOL authentication) */}
+      <Modal
+        visible={isSignInVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsSignInVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Sign In</Text>
+            <TextInput
+              placeholder="Username"
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+            />
+            <TextInput
+              placeholder="Password"
+              style={styles.input}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.modalButton} onPress={handleSignIn}>
+                <Text style={styles.modalButtonText}>Sign In</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsSignInVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.card}>
-        {/* Portfolio Total */}
+        {/* Portfolio Total with Toggle and Settings */}
         <View style={styles.cardHeader}>
           <Text style={styles.valueTitle}>Portfolio Total</Text>
-          {/* Eye icon to toggle number visibility */}
-          <Pressable onPress={() => setHideNumbers(!hideNumbers)}>
-            <Ionicons name={hideNumbers ? "eye-off" : "eye"} size={24} color="gray" />
-          </Pressable>
+          <View style={{ flexDirection: 'row' }}>
+            <Pressable onPress={() => setHideNumbers(!hideNumbers)} style={{ marginRight: 10 }}>
+              <Ionicons name={hideNumbers ? 'eye-off' : 'eye'} size={24} color="gray" />
+            </Pressable>
+            <Pressable onPress={() => setIsSignInVisible(true)}>
+              <FontAwesome name="cog" size={24} color="gray" />
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.valueAmount}>
           {showInARS ? 'ARS ' : 'USD '}
@@ -281,7 +339,6 @@ const SavingsScreen = () => {
               )}
         </Text>
 
-        {/* Performance */}
         <View style={styles.rowCompact}>
           <Text style={[styles.performance, { color: difference >= 0 ? '#008000' : '#ff0000' }]}>
             {difference >= 0 ? '+' : '-'}
@@ -293,7 +350,6 @@ const SavingsScreen = () => {
           </Text>
         </View>
 
-        {/* Selected Category Total, Percentage, and Performance */}
         {selectedType !== 'All' && (
           <>
             <View style={styles.rowCompact}>
@@ -328,7 +384,6 @@ const SavingsScreen = () => {
           </>
         )}
 
-        {/* Switch and Refresh */}
         <View style={styles.switchRowCompact}>
           <View style={styles.switchContainer}>
             <Text style={styles.switchLabel}>USD</Text>
@@ -341,7 +396,6 @@ const SavingsScreen = () => {
         </View>
       </View>
 
-      {/* Type Selection */}
       <View style={styles.typeSelectorContainer}>
         <FlatList
           data={itemTypes}
@@ -370,7 +424,6 @@ const SavingsScreen = () => {
         />
       </View>
 
-      {/* Portfolio list */}
       <View style={styles.cardContainer}>
         <FlatList
           data={filteredPortfolio}
@@ -386,11 +439,11 @@ const SavingsScreen = () => {
       </View>
     </SafeAreaView>
   );
-};
+}
 
-export default SavingsScreen;
-
+// -------------------------
 // Styles
+// -------------------------
 const styles = StyleSheet.create({
   // General Styles
   center: {
@@ -401,25 +454,25 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: 'white', // Safe area background color
+    backgroundColor: 'white',
   },
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f2', // App background color
+    backgroundColor: '#f2f2f2',
   },
 
   // Main Card Styles
   card: {
-    backgroundColor: '#ffffff', // Card background
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
     marginBottom: 8,
     padding: 12,
     borderRadius: 12,
-    elevation: 2, // Android shadow
+    elevation: 2,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4, // iOS shadow
+    shadowRadius: 4,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -595,5 +648,53 @@ const styles = StyleSheet.create({
   },
   negative: {
     color: '#F44336',
+  },
+
+  // --- Modal Styles ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 16,
+    borderRadius: 6,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    backgroundColor: '#28a745',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  cancelButton: {
+    backgroundColor: '#999',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

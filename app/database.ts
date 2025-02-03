@@ -143,3 +143,11 @@ export async function initializePortfolio(db: any) {
     throw error;
   }
 }
+
+// Default export to satisfy the router.
+export default {
+  loadDatabase,
+  isPortfolioEmpty,
+  populatePortfolioTable,
+  initializePortfolio,
+};

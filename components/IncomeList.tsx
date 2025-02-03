@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Income } from '@/app/types';
+import { useHideNumbers } from '@/app/HideNumbersContext';
 
 // Utility function to format date
 const formatDate = (date: string) => {
@@ -25,6 +26,8 @@ export default function IncomeList({
   incomes: Income[];
   deleteIncome: (id: number) => void;
 }) {
+  const { hideNumbers } = useHideNumbers();
+
   return (
     <View style={styles.listContainer}>
       {incomes.map((income, index) => (
@@ -45,10 +48,10 @@ export default function IncomeList({
             </View>
             <View style={styles.amountContainer}>
               <Text style={styles.amountText}>
-                US${formatAmountWithSeparator(income.amountUSD)}
+                US${hideNumbers ? '****' : formatAmountWithSeparator(income.amountUSD)}
               </Text>
               <Text style={styles.amountText}>
-                AR${formatAmountWithSeparator(income.amountARS)}
+                AR${hideNumbers ? '****' : formatAmountWithSeparator(income.amountARS)}
               </Text>
             </View>
           </View>

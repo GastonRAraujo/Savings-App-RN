@@ -61,3 +61,5 @@ export interface Operation {
   priceARS: number;
   priceUSD: number;
 }
+
+export default {};

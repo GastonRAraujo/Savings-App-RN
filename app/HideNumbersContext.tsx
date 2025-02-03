@@ -24,3 +24,5 @@ export const useHideNumbers = () => {
   }
   return context;
 };
+
+export default HideNumbersProvider;

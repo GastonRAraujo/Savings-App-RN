@@ -131,7 +131,8 @@ export default function ExpensesScreen() {
             <Text style={styles.cardAmount}>${formatAmountWithSeparator(totalExpensesARS)} ARS</Text>
           </View>
         </View>
-
+      
+        {/* Add Expense Button */}
         <View style={styles.buttonRow}>
           <Pressable style={styles.button} onPress={() => setIsModalVisible(true)}>
             <Text style={styles.buttonText}>Add Expense</Text>
