@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SavingsAppRN",
+    "name": "SparKontrolle",
     "slug": "SavingsAppRN",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,11 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gastonradev.SavingsAppRN"
+      "bundleIdentifier": "com.gastonradev.SparKontrolle"
     },
     "android": {
-      
-      "package": "com.gastonradev.SavingsKontrol"
+      "package": "com.gastonradev.SparKontrolle"
     },
     "web": {
       "bundler": "metro",

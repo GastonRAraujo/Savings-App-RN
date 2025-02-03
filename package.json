@@ -1,5 +1,5 @@
 {
-  "name": "savingsapprn",
+  "name": "sparkontrolle",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -36,12 +36,14 @@
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
     "react-native-svg": "^15.10.1",
-    "react-native-toast-message": "^2.2.1"
+    "react-native-toast-message": "^2.2.1",
+    "react-native-vector-icons": "^10.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@types/qs": "^6.9.17",
     "@types/react": "~18.3.12",
+    "@types/react-native-vector-icons": "^6.4.18",
     "babel-jest": "^29.7.0",
     "jest": "^29.7.0",
     "react-test-renderer": "18.2.0",
